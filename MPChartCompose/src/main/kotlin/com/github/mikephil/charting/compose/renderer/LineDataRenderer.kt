@@ -75,7 +75,7 @@ internal object LineDataRenderer {
         cache: PathCache,
         appearPhase: Float,
     ): Path {
-        val visibleCount = (entries.size * appearPhase).toInt().coerceAtLeast(1)
+        val visibleCount = (entries.size * appearPhase).toInt().coerceIn(1, entries.size)
 
         if (cache.isAppendOnly(visibleCount)) {
             // Append-only: reuse cached path and add new segments
@@ -203,7 +203,7 @@ internal object LineDataRenderer {
         appearPhase: Float,
     ) {
         val radiusPx = radius.toPx()
-        val visibleCount = (entries.size * appearPhase).toInt().coerceAtLeast(1)
+        val visibleCount = (entries.size * appearPhase).toInt().coerceIn(1, entries.size)
         for (i in 0 until visibleCount.coerceAtMost(entries.size)) {
             val pixel = transformer.dataToPixel(entries[i].x, entries[i].y)
             drawCircle(color = color, radius = radiusPx, center = pixel)
