@@ -1,7 +1,14 @@
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+    plugins {
+        id 'org.jetbrains.kotlin.android' version '2.0.21'
+        id 'org.jetbrains.kotlin.plugin.compose' version '2.0.21'
+    }
+}
+
 include 'MPChartLib'
-//include 'MPAndroidChart-Realm'
 include 'MPChartExample'
-//include ':MPChartLib-Realm'
-//project(':MPChartLib-Realm').projectDir = new File('../MPAndroidChart-Realm/MPChartLib-Realm')
-
-
