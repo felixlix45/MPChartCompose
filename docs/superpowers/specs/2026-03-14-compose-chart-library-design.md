@@ -27,7 +27,7 @@ The new module requires a Gradle/Kotlin/Compose toolchain upgrade from the curre
 - **Gradle:** 8.2+ (from current 7.2)
 - **AGP:** 8.2+ (from current 7.0.4)
 - **Kotlin:** 1.9.22+ with Compose compiler Gradle plugin
-- **Compose BOM:** 2024.02.00+ (or latest stable)
+- **Compose BOM:** 2026.03.00
 
 The existing `MPChartLib/` module (Java, compileSdk 28, minSdk 14) remains untouched. The new `MPChartCompose/` module diverges:
 
@@ -52,7 +52,7 @@ android {
 }
 
 dependencies {
-    implementation(platform("androidx.compose:compose-bom:2024.02.00"))
+    implementation(platform("androidx.compose:compose-bom:2026.03.00"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.ui:ui-graphics")
@@ -126,6 +126,14 @@ data class LineDataSet(
     val fillEnabled: Boolean = false,
     val fillBrush: Brush? = null,       // Gradient or solid fill under line
     val fillColor: Color = Color.Unspecified,  // Shorthand; fillBrush takes precedence
+    val glow: LineGlow? = null,         // LED-strip glow effect around the line
+)
+
+data class LineGlow(
+    val enabled: Boolean = true,
+    val radius: Dp = 8.dp,              // How far the glow extends from the line
+    val alpha: Float = 0.4f,            // Glow intensity (0.0–1.0)
+    val color: Color = Color.Unspecified,// Glow color; defaults to lineColor if unspecified
 )
 
 data class BarDataSet(
@@ -395,6 +403,18 @@ Three coordinate spaces with a `Transformer` object converting between them:
 - **Pixel space:** `DrawScope` coordinates for actual rendering
 
 Reverse transform (pixel → data) is used for touch/gesture hit testing.
+
+### Line Glow Rendering
+
+When `LineGlow` is set on a `LineDataSet`, the renderer draws the line path in 3 passes to create an LED-strip-in-darkness effect:
+
+1. **Outer glow** — Same path, `strokeWidth = lineWidth + glowRadius * 2`, `alpha = glowAlpha * 0.3`, with `BlurMaskFilter` (via `drawIntoCanvas` for native Paint access). Creates the soft ambient light.
+2. **Inner glow** — Same path, `strokeWidth = lineWidth + glowRadius`, `alpha = glowAlpha * 0.6`. Creates the concentrated halo.
+3. **Core line** — Original `strokeWidth` and `lineColor` at full opacity. The sharp, bright center.
+
+The glow color defaults to `lineColor` when `LineGlow.color` is `Color.Unspecified`. All three passes reuse the same cached `Path` — the only additional cost is two extra `drawPath` calls per frame, which is negligible.
+
+**Performance note:** The `BlurMaskFilter` on the outer glow pass requires `drawIntoCanvas` to access the native Android `Paint`. This is the one place the library drops below pure `DrawScope` API, but it is necessary for a proper gaussian blur glow. The blur is applied to the stroke itself (not a bitmap post-process), so it remains hardware-accelerated.
 
 ### Path Caching
 
