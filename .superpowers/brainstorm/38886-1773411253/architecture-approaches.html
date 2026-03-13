@@ -1,0 +1,141 @@
+<h2>Architecture Approaches</h2>
+<p class="subtitle">Three strategies for a high-performance Compose charting library with real-time WebSocket data</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Canvas-Direct with Snapshot State</h3>
+      <p><strong>Recommended for your use case</strong></p>
+      <p>All chart rendering happens inside <code>Canvas { }</code> composable using <code>DrawScope</code>. Data flows through Compose's <code>Snapshot</code> system but is read only in the draw phase — <strong>no recomposition on data change</strong>.</p>
+
+      <div style="margin: 16px 0; padding: 16px; background: #1a2a1a; border-radius: 8px; border-left: 3px solid #00c853;">
+        <strong style="color: #00c853;">How it handles WebSocket updates:</strong>
+        <ol style="margin: 8px 0 0 0; padding-left: 20px; color: #ccc;">
+          <li>WebSocket ticks arrive → buffered in a Channel</li>
+          <li>Frame-synced collector batches ticks per vsync (16ms)</li>
+          <li>Single atomic state swap triggers <strong>draw invalidation only</strong> (no recomposition)</li>
+          <li>Canvas reads new data directly in drawPhase via <code>Modifier.drawWithCache</code></li>
+        </ol>
+      </div>
+
+      <div class="pros-cons">
+        <div class="pros">
+          <h4>Pros</h4>
+          <ul>
+            <li>Zero recomposition on data updates — draw phase only</li>
+            <li>Natural Compose API (DrawScope, Animatable)</li>
+            <li>Frame-batching prevents WebSocket flood</li>
+            <li>Compose animation APIs work natively</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h4>Cons</h4>
+          <ul>
+            <li>Must carefully separate composition vs draw phase</li>
+            <li>DrawScope API slightly less flexible than raw Android Canvas</li>
+          </ul>
+        </div>
+      </div>
+
+      <div style="margin-top: 12px; padding: 12px; background: #1a1a2a; border-radius: 6px;">
+        <strong style="color: #8888ff;">Performance profile:</strong>
+        <span style="color: #ccc;">60fps with 10K+ points. Draw-phase-only updates. ~0 recompositions during live data streaming.</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>RenderNode + Bitmap Layer Caching</h3>
+      <p><strong>Maximum performance, more complexity</strong></p>
+      <p>Uses Android's <code>RenderNode</code> (API 23+) for hardware-accelerated layer caching. Static elements (grid, axes, labels) are cached as GPU layers. Only the data layer redraws on updates.</p>
+
+      <div style="margin: 16px 0; padding: 16px; background: #1a2a1a; border-radius: 8px; border-left: 3px solid #00c853;">
+        <strong style="color: #00c853;">How it handles WebSocket updates:</strong>
+        <ol style="margin: 8px 0 0 0; padding-left: 20px; color: #ccc;">
+          <li>Chart split into layers: background, grid, data, highlights, labels</li>
+          <li>Only the data layer invalidates on new ticks</li>
+          <li>Grid/axes/labels cached as RenderNodes — zero redraw cost</li>
+          <li>Bitmap fallback for complex paths (like filled area under line)</li>
+        </ol>
+      </div>
+
+      <div class="pros-cons">
+        <div class="pros">
+          <h4>Pros</h4>
+          <ul>
+            <li>Fastest possible rendering — GPU layer caching</li>
+            <li>Static layers (grid, axes) never redraw</li>
+            <li>Min SDK 23 = RenderNode available</li>
+            <li>Handles 50K+ points smoothly</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h4>Cons</h4>
+          <ul>
+            <li>Significantly more complex implementation</li>
+            <li>RenderNode API requires careful lifecycle management</li>
+            <li>Mixes Compose and Android graphics APIs</li>
+            <li>Harder to maintain and extend</li>
+          </ul>
+        </div>
+      </div>
+
+      <div style="margin-top: 12px; padding: 12px; background: #1a1a2a; border-radius: 6px;">
+        <strong style="color: #8888ff;">Performance profile:</strong>
+        <span style="color: #ccc;">60fps with 50K+ points. GPU-cached static layers. Only data layer redraws. Overkill for most stock chart scenarios.</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Hybrid: Canvas-Direct + Selective Layer Caching</h3>
+      <p><strong>Best balance of performance and simplicity</strong></p>
+      <p>Starts with Approach A's Canvas-direct rendering as the foundation. Adds lightweight layer separation — grid/axes use <code>drawWithCache</code> (redraws only when axis config changes), data layer redraws per frame. No RenderNode complexity.</p>
+
+      <div style="margin: 16px 0; padding: 16px; background: #1a2a1a; border-radius: 8px; border-left: 3px solid #00c853;">
+        <strong style="color: #00c853;">How it handles WebSocket updates:</strong>
+        <ol style="margin: 8px 0 0 0; padding-left: 20px; color: #ccc;">
+          <li>Frame-batched data updates (same as A)</li>
+          <li>Grid/axes cached via <code>drawWithCache</code> — only rebuild when config changes</li>
+          <li>Data layer uses <code>onDrawWithContent</code> — redraws per frame</li>
+          <li>Path caching for line charts — reuse path when only appending points</li>
+        </ol>
+      </div>
+
+      <div class="pros-cons">
+        <div class="pros">
+          <h4>Pros</h4>
+          <ul>
+            <li>Clean Compose APIs throughout — no Android graphics escape hatches</li>
+            <li>Grid/axes don't redraw on data changes</li>
+            <li>Path caching reduces draw cost for append-only updates</li>
+            <li>Simple enough to implement and maintain</li>
+            <li>Easy to upgrade to B later if needed</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h4>Cons</h4>
+          <ul>
+            <li>Not as fast as B for extreme datasets (50K+)</li>
+            <li>Still redraws data layer fully (though with path reuse)</li>
+          </ul>
+        </div>
+      </div>
+
+      <div style="margin-top: 12px; padding: 12px; background: #1a1a2a; border-radius: 6px;">
+        <strong style="color: #8888ff;">Performance profile:</strong>
+        <span style="color: #ccc;">60fps with 10K+ points. Cached static layers via Compose APIs. Path reuse on appends. Upgradeable to RenderNode if needed.</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style="margin-top: 24px; padding: 16px; background: #1a1a2a; border-radius: 8px; border: 1px solid #333;">
+  <h3 style="margin-top: 0; color: #8888ff;">My Recommendation: Option C (Hybrid)</h3>
+  <p style="color: #ccc; margin-bottom: 0;">For a stock ticker with WebSocket data, you're likely dealing with hundreds to low-thousands of visible data points — not 50K. Option C gives you the performance headroom you need (60fps easily) while keeping the codebase clean Compose throughout. If you ever hit a wall, the architecture naturally upgrades to B's RenderNode approach without a rewrite.</p>
+</div>

@@ -1,0 +1,101 @@
+<h2>Rendering Architecture</h2>
+<p class="subtitle">Layered draw pipeline — static layers cached, data layer redraws per frame</p>
+
+<div class="mockup">
+  <div class="mockup-header">Draw Pipeline (per frame)</div>
+  <div class="mockup-body" style="padding: 24px; font-family: monospace; font-size: 13px;">
+
+    <div style="display: flex; gap: 16px; margin-bottom: 24px;">
+      <!-- Left: Pipeline stages -->
+      <div style="flex: 1;">
+        <div style="padding: 12px; background: #1a2a1a; border-radius: 8px; border-left: 3px solid #00c853; margin-bottom: 8px;">
+          <strong style="color: #00c853;">Layer 1: Background</strong>
+          <div style="color: #999; font-size: 12px; margin-top: 4px;">drawWithCache — redraws only on size/theme change</div>
+          <div style="color: #ccc; margin-top: 4px;">• Fill background color</div>
+        </div>
+
+        <div style="padding: 12px; background: #1a2a1a; border-radius: 8px; border-left: 3px solid #4488ff; margin-bottom: 8px;">
+          <strong style="color: #4488ff;">Layer 2: Grid & Axes</strong>
+          <div style="color: #999; font-size: 12px; margin-top: 4px;">drawWithCache — redraws only on axis config or viewport change</div>
+          <div style="color: #ccc; margin-top: 4px;">• Grid lines (horizontal + vertical)</div>
+          <div style="color: #ccc;">• Axis lines + tick marks</div>
+          <div style="color: #ccc;">• Axis labels (formatted via lambda)</div>
+          <div style="color: #ccc;">• Limit lines (e.g., day open price)</div>
+        </div>
+
+        <div style="padding: 12px; background: #2a1a1a; border-radius: 8px; border-left: 3px solid #ff4444; margin-bottom: 8px;">
+          <strong style="color: #ff4444;">Layer 3: Data (HOT PATH)</strong>
+          <div style="color: #999; font-size: 12px; margin-top: 4px;">Redraws every frame during streaming — path caching for appends</div>
+          <div style="color: #ccc; margin-top: 4px;">• Line paths (cubic/linear/stepped)</div>
+          <div style="color: #ccc;">• Fill area under line</div>
+          <div style="color: #ccc;">• Bar rectangles</div>
+          <div style="color: #ccc;">• Data point circles</div>
+        </div>
+
+        <div style="padding: 12px; background: #1a1a2a; border-radius: 8px; border-left: 3px solid #ff88ff; margin-bottom: 8px;">
+          <strong style="color: #ff88ff;">Layer 4: Highlights & Markers</strong>
+          <div style="color: #999; font-size: 12px; margin-top: 4px;">Redraws on selection change only</div>
+          <div style="color: #ccc; margin-top: 4px;">• Vertical/horizontal crosshair lines</div>
+          <div style="color: #ccc;">• Selected point indicator</div>
+          <div style="color: #ccc;">• Value label popup</div>
+        </div>
+
+        <div style="padding: 12px; background: #1a1a1a; border-radius: 8px; border-left: 3px solid #888; margin-bottom: 8px;">
+          <strong style="color: #888;">Layer 5: Overlay</strong>
+          <div style="color: #999; font-size: 12px; margin-top: 4px;">drawWithCache — redraws only on config change</div>
+          <div style="color: #ccc; margin-top: 4px;">• Legend</div>
+          <div style="color: #ccc;">• Description text</div>
+        </div>
+      </div>
+
+      <!-- Right: Performance characteristics -->
+      <div style="flex: 0 0 280px;">
+        <div style="padding: 16px; background: #1a1a2a; border-radius: 8px; border: 1px solid #333; margin-bottom: 12px;">
+          <h3 style="margin: 0 0 12px 0; color: #8888ff;">Performance Keys</h3>
+          <div style="color: #ccc; font-size: 12px; line-height: 1.8;">
+            <div>✅ <strong>Zero recomposition</strong> on data change</div>
+            <div>✅ <strong>drawWithCache</strong> for static layers</div>
+            <div>✅ <strong>Path reuse</strong> on append-only updates</div>
+            <div>✅ <strong>Frame batching</strong> via Channel + withFrameMillis</div>
+            <div>✅ <strong>Viewport transform</strong> in draw phase only</div>
+          </div>
+        </div>
+
+        <div style="padding: 16px; background: #1a1a2a; border-radius: 8px; border: 1px solid #333; margin-bottom: 12px;">
+          <h3 style="margin: 0 0 12px 0; color: #ff8844;">Coordinate System</h3>
+          <div style="color: #ccc; font-size: 12px; line-height: 1.8;">
+            <div><strong>Data space:</strong> (x: Float, y: Float)</div>
+            <div><strong>Viewport:</strong> visible window into data space</div>
+            <div><strong>Pixel space:</strong> DrawScope coordinates</div>
+            <div style="margin-top: 8px;">Transformer converts:<br/>data → viewport → pixel<br/>pixel → viewport → data (for touch)</div>
+          </div>
+        </div>
+
+        <div style="padding: 16px; background: #1a1a2a; border-radius: 8px; border: 1px solid #333;">
+          <h3 style="margin: 0 0 12px 0; color: #00c853;">WebSocket Flow</h3>
+          <div style="color: #ccc; font-size: 12px; line-height: 1.8;">
+            <div>1. Tick arrives (any thread)</div>
+            <div>2. → Channel buffer</div>
+            <div>3. → withFrameMillis collector</div>
+            <div>4. → Batch into single update</div>
+            <div>5. → Atomic state swap</div>
+            <div>6. → Draw invalidation only</div>
+            <div>7. → Canvas reads new data</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div style="margin-top: 24px; padding: 16px; background: #1a1a2a; border-radius: 8px; border: 1px solid #333;">
+  <h3 style="margin-top: 0; color: #8888ff;">Key Insight: Composition vs Draw Phase</h3>
+  <p style="color: #ccc;">The chart composable itself rarely recomposes. Configuration (axes, style, gestures) triggers recomposition. <strong>Data changes never trigger recomposition</strong> — they only invalidate the draw phase via <code>Modifier.drawBehind</code> / <code>drawWithCache</code>. This is achieved by reading data state inside draw lambdas, not in the composable body.</p>
+  <pre style="background: #111; padding: 12px; border-radius: 6px; color: #ccc; font-size: 12px; overflow-x: auto;">
+// Data read happens HERE (draw phase) — not in composition
+Modifier.drawBehind {
+    val currentData = chartState.data  // snapshot read → draw invalidation only
+    drawLineData(currentData, transformer, animationPhase)
+}</pre>
+</div>
