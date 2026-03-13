@@ -11,7 +11,8 @@
         android:theme="@style/AppTheme">
         <activity
             android:name="com.xxmassdeveloper.mpchartexample.notimportant.MainActivity"
-            android:label="@string/app_name" >
+            android:label="@string/app_name"
+            android:exported="true" >
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <action android:name="android.intent.action.VIEW" />
@@ -51,6 +52,10 @@
         <activity android:name="BarChartPositiveNegative" />
         <activity android:name="FilledLineActivity" />
         <activity android:name="HalfPieChartActivity" />
+        <activity
+            android:name=".ComposeChartDemoActivity"
+            android:label="Compose Charts Demo"
+            android:exported="true" />
     </application>
 
 </manifest>
