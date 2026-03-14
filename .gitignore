@@ -45,3 +45,6 @@ build/
 target/
 
 .DS_Store
+
+# Claude Code
+CLAUDE.md
