@@ -42,6 +42,7 @@ import com.github.mikephil.charting.compose.data.LineData
 import com.github.mikephil.charting.compose.data.LineDataSet
 import com.github.mikephil.charting.compose.data.LineGlow
 import com.github.mikephil.charting.compose.data.LineMode
+import com.github.mikephil.charting.compose.scope.XAxisLabelPosition
 import com.github.mikephil.charting.compose.style.ChartStyle
 import com.github.mikephil.charting.compose.style.ChartThemeProvider
 import kotlin.math.sin
@@ -120,6 +121,9 @@ private fun ComposeChartDemoScreen() {
                     circleRadius = 6.dp
                     yAxisLabel = true
                     yAxisLabelFormatter = { "$${String.format("%.2f", it)}" }
+                    xAxisLabel = true
+                    xAxisLabelFormatter = { "${it.toInt()}:00" }
+                    xAxisLabelPosition = XAxisLabelPosition.Top
                 },
                 gestures = {
                     tapToHighlight = true
@@ -154,6 +158,18 @@ private fun ComposeChartDemoScreen() {
                     gridEnabled = true
                     formatter = { "$${String.format("%.0f", it)}" }
                     labelCount = 5
+                },
+                highlight = {
+                    crosshairEnabled = true
+                    circleColor = Color.White
+                    circleRadius = 6.dp
+                    yAxisLabel = true
+                    yAxisLabelFormatter = { "$${String.format("%.2f", it)}" }
+                },
+                gestures = {
+                    tapToHighlight = true
+                    dragToScrub = true
+                    dragToPan = false
                 },
                 animation = {
                     appear = ChartAnimation.EaseInOut(1200.milliseconds)
