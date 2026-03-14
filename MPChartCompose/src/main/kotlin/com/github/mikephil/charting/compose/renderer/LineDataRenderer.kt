@@ -141,31 +141,48 @@ internal object LineDataRenderer {
     ) {
         val glowColor = if (glow.color != Color.Unspecified) glow.color else lineColor
         val glowRadiusPx = glow.radius.toPx()
+        if (glowRadiusPx <= 0f) return
 
-        // Pass 1: Outer glow with blur
-        drawIntoCanvas { canvas ->
-            val paint = android.graphics.Paint().apply {
-                isAntiAlias = true
-                color = glowColor.copy(alpha = glow.alpha * 0.3f).toArgb()
-                strokeWidth = lineWidthPx + glowRadiusPx * 2
-                style = android.graphics.Paint.Style.STROKE
-                strokeCap = android.graphics.Paint.Cap.ROUND
-                strokeJoin = android.graphics.Paint.Join.ROUND
-                maskFilter = BlurMaskFilter(glowRadiusPx, BlurMaskFilter.Blur.NORMAL)
-            }
-            canvas.nativeCanvas.drawPath(path.asAndroidPath(), paint)
-        }
-
-        // Pass 2: Inner glow
-        drawPath(
-            path = path,
-            color = glowColor.copy(alpha = glow.alpha * 0.6f),
-            style = Stroke(
-                width = lineWidthPx + glowRadiusPx,
-                cap = StrokeCap.Round,
-                join = StrokeJoin.Round,
-            ),
+        // Pad the bitmap so the blur isn't clipped at the edges
+        val padding = (glowRadiusPx * 1.5f).toInt().coerceAtLeast(1)
+        val bitmapW = (size.width.toInt() + padding * 2).coerceAtLeast(1)
+        val bitmapH = (size.height.toInt() + padding * 2).coerceAtLeast(1)
+        val bitmap = android.graphics.Bitmap.createBitmap(
+            bitmapW, bitmapH, android.graphics.Bitmap.Config.ARGB_8888
         )
+        val softwareCanvas = android.graphics.Canvas(bitmap)
+        softwareCanvas.translate(padding.toFloat(), padding.toFloat())
+
+        val androidPath = path.asAndroidPath()
+
+        // Outer glow: wide blur, thicker stroke, boosted alpha to survive the spread
+        val outerPaint = android.graphics.Paint().apply {
+            isAntiAlias = true
+            color = glowColor.copy(alpha = (glow.alpha * 2f).coerceAtMost(1f)).toArgb()
+            strokeWidth = lineWidthPx + glowRadiusPx * 0.5f
+            style = android.graphics.Paint.Style.STROKE
+            strokeCap = android.graphics.Paint.Cap.ROUND
+            strokeJoin = android.graphics.Paint.Join.ROUND
+            maskFilter = BlurMaskFilter(glowRadiusPx, BlurMaskFilter.Blur.NORMAL)
+        }
+        softwareCanvas.drawPath(androidPath, outerPaint)
+
+        // Inner glow: tighter blur, brighter — creates the bright halo near the line
+        val innerPaint = android.graphics.Paint().apply {
+            isAntiAlias = true
+            color = glowColor.copy(alpha = (glow.alpha * 3f).coerceAtMost(1f)).toArgb()
+            strokeWidth = lineWidthPx
+            style = android.graphics.Paint.Style.STROKE
+            strokeCap = android.graphics.Paint.Cap.ROUND
+            strokeJoin = android.graphics.Paint.Join.ROUND
+            maskFilter = BlurMaskFilter(glowRadiusPx * 0.4f, BlurMaskFilter.Blur.NORMAL)
+        }
+        softwareCanvas.drawPath(androidPath, innerPaint)
+
+        drawIntoCanvas { canvas ->
+            canvas.nativeCanvas.drawBitmap(bitmap, -padding.toFloat(), -padding.toFloat(), null)
+        }
+        bitmap.recycle()
     }
 
     private fun DrawScope.drawFill(
