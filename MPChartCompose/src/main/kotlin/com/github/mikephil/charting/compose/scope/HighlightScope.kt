@@ -4,6 +4,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
+enum class XAxisLabelPosition { Bottom, Top }
+
 class HighlightScope {
     var circleRadius: Dp = 6.dp
     var circleColor: Color = Color.White
@@ -18,4 +20,5 @@ class HighlightScope {
     var yAxisLabelFormatter: ((Float) -> String)? = null
     var xAxisLabel: Boolean = false
     var xAxisLabelFormatter: ((Float) -> String)? = null
+    var xAxisLabelPosition: XAxisLabelPosition = XAxisLabelPosition.Bottom
 }

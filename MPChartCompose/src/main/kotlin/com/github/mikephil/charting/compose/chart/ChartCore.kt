@@ -26,6 +26,7 @@ import com.github.mikephil.charting.compose.renderer.LegendRenderer
 import com.github.mikephil.charting.compose.scope.GestureScope
 import com.github.mikephil.charting.compose.scope.HighlightScope
 import com.github.mikephil.charting.compose.scope.LegendScope
+import com.github.mikephil.charting.compose.scope.XAxisLabelPosition
 import com.github.mikephil.charting.compose.scope.ViewportScope
 import com.github.mikephil.charting.compose.scope.XAxisScope
 import com.github.mikephil.charting.compose.scope.YAxisScope
@@ -105,13 +106,17 @@ internal fun ChartCore(
             }
 
             if (highlightConfig.xAxisLabel) {
+                val labelY = when (highlightConfig.xAxisLabelPosition) {
+                    XAxisLabelPosition.Bottom -> chartSize.height - bottomMargin
+                    XAxisLabelPosition.Top -> topMargin - 20f
+                }
                 DynamicXAxisLabel(
                     pixelX = highlight.pixelPosition.x,
                     value = highlight.x,
                     formatter = highlightConfig.xAxisLabelFormatter,
                     labelColor = highlightConfig.yAxisLabelColor,
                     backgroundColor = highlightConfig.yAxisLabelBackground,
-                    chartBottom = chartSize.height - bottomMargin,
+                    labelY = labelY,
                 )
             }
         }

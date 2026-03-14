@@ -55,7 +55,7 @@ internal fun DynamicXAxisLabel(
     formatter: ((Float) -> String)?,
     labelColor: Color,
     backgroundColor: Color,
-    chartBottom: Float,
+    labelY: Float,
 ) {
     val animatedX by animateFloatAsState(
         targetValue = pixelX,
@@ -68,7 +68,7 @@ internal fun DynamicXAxisLabel(
 
     Box(
         modifier = Modifier
-            .offset { IntOffset((animatedX - 30).toInt(), chartBottom.toInt()) }
+            .offset { IntOffset((animatedX - 30).toInt(), labelY.toInt()) }
             .background(bgColor, RoundedCornerShape(4.dp))
             .padding(horizontal = 4.dp, vertical = 2.dp)
     ) {
