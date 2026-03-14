@@ -1,7 +1,7 @@
 package com.github.mikephil.charting.compose.marker
 
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.snap
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.offset
@@ -28,7 +28,7 @@ internal fun DynamicYAxisLabel(
 ) {
     val animatedY by animateFloatAsState(
         targetValue = pixelY,
-        animationSpec = spring(),
+        animationSpec = snap(),
         label = "y_axis_label",
     )
 
@@ -59,7 +59,7 @@ internal fun DynamicXAxisLabel(
 ) {
     val animatedX by animateFloatAsState(
         targetValue = pixelX,
-        animationSpec = spring(),
+        animationSpec = snap(),
         label = "x_axis_label",
     )
 
