@@ -32,8 +32,10 @@ import com.github.mikephil.charting.compose.scope.XAxisScope
 import com.github.mikephil.charting.compose.scope.YAxisScope
 import com.github.mikephil.charting.compose.state.BarChartState
 import com.github.mikephil.charting.compose.style.LocalChartStyle
+import com.github.mikephil.charting.compose.util.AxisComputer
 import com.github.mikephil.charting.compose.util.EntryFinder
 import com.github.mikephil.charting.compose.util.Transformer
+import kotlin.math.abs
 
 @Composable
 fun BarChart(
@@ -146,22 +148,35 @@ fun BarChart(
             val dataYMin = allEntriesNow.minOf { it.effectiveY }.coerceAtMost(0f)
             val dataYMax = allEntriesNow.maxOf { it.effectiveY }
 
-            val yPadding = (dataYMax - dataYMin) * 0.05f
             val xPadding = currentData.barWidth / 2f
             val contentRect = Rect(
                 left = 48f, top = if (legendConfig.enabled) 24f else 8f,
                 right = size.width - 8f, bottom = size.height - 32f
             )
 
-            val xRange = if (dataXMin == dataXMax) (dataXMin - 1f)..(dataXMax + 1f) else (dataXMin - xPadding)..(dataXMax + xPadding)
-            val yRange = if (dataYMin == dataYMax) (dataYMin - 1f)..(dataYMax + 1f) else (dataYMin - yPadding)..(dataYMax + yPadding)
+            // Y-axis range with spaceTop/spaceBottom (matching original YAxis.calculate())
+            val yDataRange = abs(dataYMax - dataYMin)
+            val adjYMin = if (yDataRange == 0f) dataYMin - 1f else dataYMin
+            val adjYMax = if (yDataRange == 0f) dataYMax + 1f else dataYMax
+            val adjYRange = abs(adjYMax - adjYMin)
+            val yMin = yAxisConfig.axisMinimum ?: (adjYMin - (adjYRange / 100f) * yAxisConfig.spaceBottom)
+            val yMax = yAxisConfig.axisMaximum ?: (adjYMax + (adjYRange / 100f) * yAxisConfig.spaceTop)
+
+            // X-axis range: bar charts add barWidth/2 on top of spaceMin/spaceMax
+            val baseXMin = xAxisConfig.axisMinimum ?: (dataXMin - xPadding - xAxisConfig.spaceMin)
+            val baseXMax = xAxisConfig.axisMaximum ?: (dataXMax + xPadding + xAxisConfig.spaceMax)
+            val xMin = if (baseXMin == baseXMax) baseXMin - 1f else baseXMin
+            val xMax = if (baseXMin == baseXMax) baseXMax + 1f else baseXMax
+
+            val xRange = xMin..xMax
+            val yRange = yMin..yMax
 
             val transformer = Transformer(contentRect, xRange, yRange)
             currentTransformer = transformer
 
-            // Compute label values
-            val xLabels = computeLabels(xRange, xAxisConfig.labelCount)
-            val yLabels = computeLabels(yRange, yAxisConfig.labelCount)
+            // Compute label values using nice-number algorithm
+            val xLabels = AxisComputer.computeAxisValues(xRange.start, xRange.endInclusive, xAxisConfig.labelCount, xAxisConfig.granularity, xAxisConfig.forceLabels).labels
+            val yLabels = AxisComputer.computeAxisValues(yRange.start, yRange.endInclusive, yAxisConfig.labelCount, yAxisConfig.granularity, yAxisConfig.forceLabels).labels
 
             // Layer 2: Grid + Axes
             with(GridRenderer) {
