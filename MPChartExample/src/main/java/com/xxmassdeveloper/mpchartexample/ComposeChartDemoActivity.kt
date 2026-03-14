@@ -138,27 +138,29 @@ private fun ComposeChartDemoScreen() {
             )
 
             // 2. Line Chart with Glow Effect
-            SectionTitle("2. Line Chart — Glow Effect")
+            SectionTitle("2. Line Chart — Stock Price with Glow")
             LineChart(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(250.dp),
                 data = sampleGlowLineData(),
                 xAxis = {
-                    gridEnabled = false
+                    gridEnabled = true
                     drawLabels = true
-                    labelCount = 5
+                    labelCount = 6
+                    formatter = { "${it.toInt()}:00" }
                 },
                 yAxis = {
                     gridEnabled = true
-                    formatter = { String.format("%.0f", it) }
+                    formatter = { "$${String.format("%.0f", it)}" }
+                    labelCount = 5
                 },
                 animation = {
                     appear = ChartAnimation.EaseInOut(1200.milliseconds)
                 },
                 style = {
-                    backgroundColor = Color(0xFF0A0A1A)
-                    gridColor = Color(0xFF1A1A3A)
+                    backgroundColor = Color(0xFF0D1117)
+                    gridColor = Color(0xFF21262D)
                 },
                 legend = { enabled = true },
             )
@@ -427,23 +429,24 @@ private fun sampleStockLineData(): LineData {
 }
 
 private fun sampleGlowLineData(): LineData {
-    val entries = (0..30).map { i ->
-        Entry(x = i.toFloat(), y = (50 + sin(i * 0.3) * 30 + i * 0.5).toFloat())
+    val entries = (0..23).map { hour ->
+        val price = 165f + sin(hour * 0.5) * 8f + hour * 0.5f
+        Entry(x = hour.toFloat(), y = price.toFloat())
     }
     return LineData(
         dataSets = listOf(
             LineDataSet(
                 entries = entries,
-                label = "Signal",
-                lineColor = Color(0xFF00E5FF),
+                label = "AAPL",
+                lineColor = Color(0xFF4CAF50),
                 lineWidth = 2.5.dp,
                 drawCircles = false,
-                mode = LineMode.CubicBezier,
+                mode = LineMode.Linear,
                 glow = LineGlow(
                     enabled = true,
-                    radius = 12.dp,
-                    alpha = 0.5f,
-                    color = Color(0xFF00E5FF),
+                    radius = 24.dp,
+                    alpha = 0.2f,
+                    color = Color(0xFF4CAF50),
                 ),
             )
         )
