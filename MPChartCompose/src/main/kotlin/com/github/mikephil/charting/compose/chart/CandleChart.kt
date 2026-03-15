@@ -14,6 +14,7 @@ import androidx.compose.ui.unit.TextUnit
 import com.github.mikephil.charting.compose.animation.ChartAnimator
 import com.github.mikephil.charting.compose.data.CandleData
 import com.github.mikephil.charting.compose.data.CandleEntry
+import com.github.mikephil.charting.compose.data.YAxisPosition
 import com.github.mikephil.charting.compose.gesture.chartGestureHandler
 import com.github.mikephil.charting.compose.highlight.Highlight
 import com.github.mikephil.charting.compose.renderer.AxisLabelRenderer
@@ -148,9 +149,12 @@ fun CandleChart(
             val dataYMin = allEntriesNow.minOf { it.low }
             val dataYMax = allEntriesNow.maxOf { it.high }
 
+            val yAxisOnRight = yAxisConfig.position == YAxisPosition.Right
             val contentRect = Rect(
-                left = 48f, top = if (legendConfig.enabled) 24f else 8f,
-                right = size.width - 8f, bottom = size.height - 32f
+                left = if (yAxisOnRight) 8f else 48f,
+                top = if (legendConfig.enabled) 24f else 8f,
+                right = if (yAxisOnRight) size.width - 48f else size.width - 8f,
+                bottom = size.height - 32f
             )
 
             // Y-axis range with spaceTop/spaceBottom (matching original YAxis.calculate())
@@ -190,6 +194,7 @@ fun CandleChart(
                     axisLineColor = chartStyle.axisLineColor,
                     drawXAxisLine = xAxisConfig.axisLineEnabled,
                     drawYAxisLine = yAxisConfig.axisLineEnabled,
+                    yAxisOnRight = yAxisOnRight,
                 )
             }
 
@@ -201,7 +206,7 @@ fun CandleChart(
             }
             if (yAxisConfig.drawLabels) {
                 with(AxisLabelRenderer) {
-                    drawYAxisLabels(transformer, yLabels, yAxisConfig.formatter, textMeasurer, chartStyle.axisLabelColor, chartStyle.axisLabelSize)
+                    drawYAxisLabels(transformer, yLabels, yAxisConfig.formatter, textMeasurer, chartStyle.axisLabelColor, chartStyle.axisLabelSize, yAxisOnRight = yAxisOnRight)
                 }
             }
 
@@ -225,6 +230,7 @@ fun CandleChart(
                         highlight = hl,
                         transformer = transformer,
                         crosshairEnabled = highlightConfig.crosshairEnabled,
+                        crosshairMode = highlightConfig.crosshairMode,
                         crosshairColor = highlightConfig.crosshairColor,
                         crosshairWidth = highlightConfig.crosshairWidth,
                         circleRadius = highlightConfig.circleRadius,

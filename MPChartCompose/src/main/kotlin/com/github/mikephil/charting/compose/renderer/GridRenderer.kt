@@ -18,6 +18,7 @@ internal object GridRenderer {
         axisLineColor: Color,
         drawXAxisLine: Boolean,
         drawYAxisLine: Boolean,
+        yAxisOnRight: Boolean = false,
     ) {
         val strokeWidth = gridLineWidth.toPx()
         val contentRect = transformer.contentRect
@@ -59,10 +60,11 @@ internal object GridRenderer {
             )
         }
         if (drawYAxisLine) {
+            val yAxisX = if (yAxisOnRight) contentRect.right else contentRect.left
             drawLine(
                 color = axisLineColor,
-                start = Offset(contentRect.left, contentRect.top),
-                end = Offset(contentRect.left, contentRect.bottom),
+                start = Offset(yAxisX, contentRect.top),
+                end = Offset(yAxisX, contentRect.bottom),
                 strokeWidth = strokeWidth * 2,
             )
         }
