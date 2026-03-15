@@ -42,6 +42,7 @@ import com.github.mikephil.charting.compose.data.LineData
 import com.github.mikephil.charting.compose.data.LineDataSet
 import com.github.mikephil.charting.compose.data.LineGlow
 import com.github.mikephil.charting.compose.data.LineMode
+import com.github.mikephil.charting.compose.scope.CrosshairMode
 import com.github.mikephil.charting.compose.scope.XAxisLabelPosition
 import com.github.mikephil.charting.compose.style.ChartStyle
 import com.github.mikephil.charting.compose.style.ChartThemeProvider
@@ -117,6 +118,7 @@ private fun ComposeChartDemoScreen() {
                 },
                 highlight = {
                     crosshairEnabled = true
+                    crosshairMode = CrosshairMode.VerticalOnly
                     circleColor = Color.White
                     circleRadius = 6.dp
                     yAxisLabel = true
