@@ -155,14 +155,6 @@ fun LineChart(
             val dataYMin = allEntriesNow.minOf { it.y }
             val dataYMax = allEntriesNow.maxOf { it.y }
 
-            val yAxisOnRight = yAxisConfig.position == YAxisPosition.Right
-            val contentRect = Rect(
-                left = if (yAxisOnRight) 8f else 48f,
-                top = if (legendConfig.enabled) 24f else 8f,
-                right = if (yAxisOnRight) size.width - 48f else size.width - 8f,
-                bottom = size.height - 32f
-            )
-
             // Y-axis range with spaceTop/spaceBottom (matching original YAxis.calculate())
             val yDataRange = abs(dataYMax - dataYMin)
             val adjYMin = if (yDataRange == 0f) dataYMin - 1f else dataYMin
@@ -180,12 +172,29 @@ fun LineChart(
             val xRange = xMin..xMax
             val yRange = yMin..yMax
 
-            val transformer = Transformer(contentRect, xRange, yRange)
-            currentTransformer = transformer
-
-            // Compute label values using nice-number algorithm
+            // Compute labels before contentRect so we can measure y-axis label width
             val xLabels = AxisComputer.computeAxisValues(xRange.start, xRange.endInclusive, xAxisConfig.labelCount, xAxisConfig.granularity, xAxisConfig.forceLabels).labels
             val yLabels = AxisComputer.computeAxisValues(yRange.start, yRange.endInclusive, yAxisConfig.labelCount, yAxisConfig.granularity, yAxisConfig.forceLabels).labels
+
+            // Measure widest y-axis label to size the content rect
+            val labelStyle = androidx.compose.ui.text.TextStyle(color = chartStyle.axisLabelColor, fontSize = chartStyle.axisLabelSize)
+            val yAxisWidth = if (yAxisConfig.drawLabels && yLabels.isNotEmpty()) {
+                yLabels.maxOf { value ->
+                    val text = yAxisConfig.formatter?.invoke(value) ?: value.toString()
+                    textMeasurer.measure(text, labelStyle).size.width
+                }.toFloat() + 8f
+            } else 8f
+
+            val yAxisOnRight = yAxisConfig.position == YAxisPosition.Right
+            val contentRect = Rect(
+                left = if (yAxisOnRight) 8f else yAxisWidth,
+                top = if (legendConfig.enabled) 24f else 8f,
+                right = if (yAxisOnRight) size.width - yAxisWidth else size.width - 8f,
+                bottom = size.height - 32f
+            )
+
+            val transformer = Transformer(contentRect, xRange, yRange)
+            currentTransformer = transformer
 
             // Layer 2: Grid + Axes
             with(GridRenderer) {
