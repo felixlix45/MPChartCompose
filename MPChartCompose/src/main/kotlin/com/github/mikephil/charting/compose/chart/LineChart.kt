@@ -55,6 +55,7 @@ fun LineChart(
     legend: (LegendScope.() -> Unit)? = null,
     viewport: (ViewportScope.() -> Unit)? = null,
     onValueSelected: ((Entry) -> Unit)? = null,
+    onNothingSelected: (() -> Unit)? = null,
 ) {
     // Resolve configurations
     val baseStyle = LocalChartStyle.current
@@ -120,6 +121,7 @@ fun LineChart(
         onValueSelected = { idx ->
             allEntries.getOrNull(idx)?.let { onValueSelected?.invoke(it) }
         },
+        onNothingSelected = onNothingSelected,
     )
 
     // Marker wrapper

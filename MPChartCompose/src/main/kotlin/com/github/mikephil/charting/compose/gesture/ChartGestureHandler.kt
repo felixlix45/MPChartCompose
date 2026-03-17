@@ -26,6 +26,7 @@ internal fun Modifier.chartGestureHandler(
     getEntryY: (index: Int) -> Float,
     onTranslationChange: (Float) -> Unit,
     onValueSelected: ((Int) -> Unit)?,
+    onNothingSelected: (() -> Unit)?,
 ): Modifier = this.pointerInput(
     tapToHighlight, dragToPan, dragToScrub, flingEnabled
 ) {
@@ -55,17 +56,24 @@ internal fun Modifier.chartGestureHandler(
 
             // Handle tap
             if (tapToHighlight && nearestIdx >= 0) {
-                val entryX = getEntryX(nearestIdx)
-                val entryY = getEntryY(nearestIdx)
-                val pixel = transformer.dataToPixel(entryX, entryY)
-                highlightState.value = Highlight(
-                    dataSetIndex = 0,
-                    entryIndex = nearestIdx,
-                    x = entryX,
-                    y = entryY,
-                    pixelPosition = pixel,
-                )
-                onValueSelected?.invoke(nearestIdx)
+                val currentHighlight = highlightState.value
+                if (currentHighlight != null && currentHighlight.entryIndex == nearestIdx) {
+                    // Tapping the already-highlighted point → deselect
+                    highlightState.value = null
+                    onNothingSelected?.invoke()
+                } else {
+                    val entryX = getEntryX(nearestIdx)
+                    val entryY = getEntryY(nearestIdx)
+                    val pixel = transformer.dataToPixel(entryX, entryY)
+                    highlightState.value = Highlight(
+                        dataSetIndex = 0,
+                        entryIndex = nearestIdx,
+                        x = entryX,
+                        y = entryY,
+                        pixelPosition = pixel,
+                    )
+                    onValueSelected?.invoke(nearestIdx)
+                }
             }
 
             var totalDragX = 0f
@@ -107,6 +115,7 @@ internal fun Modifier.chartGestureHandler(
             // Clear highlight after scrub ends
             if (isScrub) {
                 highlightState.value = null
+                onNothingSelected?.invoke()
             }
 
             // Fling after pan

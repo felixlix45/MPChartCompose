@@ -53,6 +53,7 @@ fun BarChart(
     legend: (LegendScope.() -> Unit)? = null,
     viewport: (ViewportScope.() -> Unit)? = null,
     onValueSelected: ((BarEntry) -> Unit)? = null,
+    onNothingSelected: (() -> Unit)? = null,
 ) {
     // Resolve configurations
     val baseStyle = LocalChartStyle.current
@@ -114,6 +115,7 @@ fun BarChart(
         onValueSelected = { idx ->
             allEntries.getOrNull(idx)?.let { onValueSelected?.invoke(it) }
         },
+        onNothingSelected = onNothingSelected,
     )
 
     // Marker wrapper
