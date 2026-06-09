@@ -54,6 +54,7 @@ fun CandleChart(
     viewport: (ViewportScope.() -> Unit)? = null,
     onValueSelected: ((CandleEntry) -> Unit)? = null,
     onNothingSelected: (() -> Unit)? = null,
+    onScrubStarted: (() -> Unit)? = null,
 ) {
     // Resolve configurations
     val baseStyle = LocalChartStyle.current
@@ -117,6 +118,7 @@ fun CandleChart(
             allEntries.getOrNull(idx)?.let { onValueSelected?.invoke(it) }
         },
         onNothingSelected = onNothingSelected,
+        onScrubStarted = onScrubStarted,
     )
 
     // Marker wrapper
