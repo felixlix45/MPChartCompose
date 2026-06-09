@@ -56,6 +56,8 @@ fun LineChart(
     viewport: (ViewportScope.() -> Unit)? = null,
     onValueSelected: ((Entry) -> Unit)? = null,
     onNothingSelected: (() -> Unit)? = null,
+    onScrubTouchDown: (() -> Unit)? = null,
+    onScrubStarted: (() -> Unit)? = null,
 ) {
     // Resolve configurations
     val baseStyle = LocalChartStyle.current
@@ -123,6 +125,8 @@ fun LineChart(
             allEntries.getOrNull(idx)?.let { onValueSelected?.invoke(it) }
         },
         onNothingSelected = onNothingSelected,
+        onScrubTouchDown = onScrubTouchDown,
+        onScrubStarted = onScrubStarted,
     )
 
     // Marker wrapper
