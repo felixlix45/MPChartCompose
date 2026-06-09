@@ -1,5 +1,6 @@
 package com.xxmassdeveloper.mpchartexample
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -23,9 +25,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.xxmassdeveloper.mpchartexample.cryptodetaildemo.CryptoDetailScrollScrubDemoActivity
 import com.github.mikephil.charting.compose.animation.ChartAnimation
 import com.github.mikephil.charting.compose.chart.BarChart
 import com.github.mikephil.charting.compose.chart.CandleChart
@@ -62,6 +66,7 @@ class ComposeChartDemoActivity : ComponentActivity() {
 @Composable
 private fun ComposeChartDemoScreen() {
     val darkBackground = Color(0xFF121212)
+    val context = LocalContext.current
 
     ChartThemeProvider(
         style = ChartStyle(
@@ -93,6 +98,17 @@ private fun ComposeChartDemoScreen() {
                 color = Color(0xFF888888),
                 fontSize = 14.sp,
             )
+
+            Button(
+                onClick = {
+                    context.startActivity(
+                        Intent(context, CryptoDetailScrollScrubDemoActivity::class.java),
+                    )
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Open Crypto Detail Scroll/Scrub Demo")
+            }
 
             Spacer(modifier = Modifier.height(8.dp))
 
