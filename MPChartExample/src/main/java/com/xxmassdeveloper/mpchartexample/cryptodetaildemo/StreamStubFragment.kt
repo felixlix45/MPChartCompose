@@ -2,6 +2,7 @@ package com.xxmassdeveloper.mpchartexample.cryptodetaildemo
 
 import android.os.Bundle
 import android.view.LayoutInflater
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
@@ -12,6 +13,15 @@ import com.xxmassdeveloper.mpchartexample.R
 
 class StreamStubFragment : Fragment() {
 
+    private var streamRecyclerView: RecyclerView? = null
+    private var listScrollEnabled = true
+
+    private val scrollBlockListener = object : RecyclerView.SimpleOnItemTouchListener() {
+        override fun onInterceptTouchEvent(recyclerView: RecyclerView, event: MotionEvent): Boolean {
+            return !listScrollEnabled
+        }
+    }
+
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -21,9 +31,27 @@ class StreamStubFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         view.findViewById<RecyclerView>(R.id.rv_stream_stub)?.apply {
+            streamRecyclerView = this
             layoutManager = LinearLayoutManager(requireContext())
             adapter = StreamStubAdapter(createMockPosts())
             setHasFixedSize(true)
+        }
+    }
+
+    /**
+     * Blocks direct list scrolling during chart scrub without toggling nested scrolling.
+     * Disabling nested scrolling breaks CoordinatorLayout and snaps the AppBar to expanded.
+     */
+    fun setListScrollEnabled(enabled: Boolean) {
+        if (listScrollEnabled == enabled) return
+        listScrollEnabled = enabled
+        streamRecyclerView?.apply {
+            if (!enabled) {
+                stopScroll()
+                addOnItemTouchListener(scrollBlockListener)
+            } else {
+                removeOnItemTouchListener(scrollBlockListener)
+            }
         }
     }
 

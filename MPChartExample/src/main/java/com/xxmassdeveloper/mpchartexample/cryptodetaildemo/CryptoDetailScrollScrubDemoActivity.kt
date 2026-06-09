@@ -2,9 +2,9 @@ package com.xxmassdeveloper.mpchartexample.cryptodetaildemo
 
 import android.os.Bundle
 import android.view.View
+import android.view.ViewGroup
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -15,14 +15,10 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
-import androidx.lifecycle.lifecycleScope
+import androidx.coordinatorlayout.widget.CoordinatorLayout
 import com.google.android.material.appbar.AppBarLayout
-import com.google.android.material.appbar.CollapsingToolbarLayout
 import com.google.android.material.tabs.TabLayout
 import com.xxmassdeveloper.mpchartexample.R
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.launch
 import androidx.viewpager.widget.ViewPager
 
 /**
@@ -31,20 +27,44 @@ import androidx.viewpager.widget.ViewPager
  */
 class CryptoDetailScrollScrubDemoActivity : AppCompatActivity() {
 
-    private val isScrubbing = MutableStateFlow(false)
     private val chartPoints = generateDemoChartPoints()
+
+    private var appBarLayout: AppBarLayout? = null
+    private var appBarBehavior: AppBarLayout.Behavior? = null
+    private var latestAppBarOffset = 0
+    private var lockedAppBarOffset = 0
+    private var isScrubLockActive = false
+
+    private val appBarDragCallback = object : AppBarLayout.Behavior.DragCallback() {
+        override fun canDrag(appBarLayout: AppBarLayout): Boolean = !isScrubLockActive
+    }
+
+    private val scrubOffsetGuard = AppBarLayout.OnOffsetChangedListener { _, verticalOffset ->
+        if (!isScrubLockActive) {
+            latestAppBarOffset = verticalOffset
+            return@OnOffsetChangedListener
+        }
+        if (verticalOffset != lockedAppBarOffset) {
+            appBarBehavior?.setTopAndBottomOffset(lockedAppBarOffset)
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_crypto_scroll_scrub_demo)
+
+        appBarLayout = findViewById(R.id.abl_demo_detail)
+        appBarBehavior = (appBarLayout?.layoutParams as? CoordinatorLayout.LayoutParams)
+            ?.behavior as? AppBarLayout.Behavior
+        appBarBehavior?.setDragCallback(appBarDragCallback)
+        appBarLayout?.addOnOffsetChangedListener(scrubOffsetGuard)
 
         setupToolbar()
         setupHeader()
         setupGlow()
         setupBottomBar()
         setupViewPager()
-        setupScrollListener()
-        setupChartScrubLock()
+        setupGlowScrollSync()
     }
 
     private fun setupToolbar() {
@@ -67,11 +87,11 @@ class CryptoDetailScrollScrubDemoActivity : AppCompatActivity() {
                     scrubbedPoint = scrubbedPoint,
                     onScrub = { point ->
                         scrubbedPoint = point
-                        isScrubbing.value = true
                     },
+                    onScrubStart = ::beginChartScrubLock,
                     onScrubEnd = {
                         scrubbedPoint = null
-                        isScrubbing.value = false
+                        endChartScrubLock()
                     },
                 )
             }
@@ -121,34 +141,46 @@ class CryptoDetailScrollScrubDemoActivity : AppCompatActivity() {
         tabLayout.setupWithViewPager(viewPager)
     }
 
-    private fun setupScrollListener() {
-        val appBarLayout = findViewById<AppBarLayout>(R.id.abl_demo_detail) ?: return
+    private fun setupGlowScrollSync() {
         val glowView = findViewById<View>(R.id.cv_demo_glow) ?: return
-
-        appBarLayout.addOnOffsetChangedListener(
-            AppBarLayout.OnOffsetChangedListener { _, verticalOffset ->
-                glowView.translationY = verticalOffset.toFloat()
-            },
-        )
+        appBarLayout?.addOnOffsetChangedListener { _, verticalOffset ->
+            glowView.translationY = verticalOffset.toFloat()
+        }
     }
 
-    private fun setupChartScrubLock() {
-        val collapsingToolbar = findViewById<CollapsingToolbarLayout>(R.id.ctl_demo_header)
-            ?: return
-        val scrollFlags = (collapsingToolbar.layoutParams as AppBarLayout.LayoutParams).scrollFlags
+    /**
+     * Pins the current AppBar collapse offset while scrubbing.
+     *
+     * Do not toggle [AppBarLayout.LayoutParams.scrollFlags] — that relayout expands the header.
+     * Do not disable RecyclerView nested scrolling — that makes [ScrollingViewBehavior] expand the AppBar.
+     */
+    private fun beginChartScrubLock() {
+        if (isScrubLockActive) return
+        lockedAppBarOffset = latestAppBarOffset
+        isScrubLockActive = true
+        appBarBehavior?.setTopAndBottomOffset(lockedAppBarOffset)
+        requestChartGestureOwnership(active = true)
+        setStreamListScrollEnabled(enabled = false)
+    }
 
-        lifecycleScope.launch {
-            isScrubbing
-                .map { scrubbing -> scrubbing }
-                .collect { scrubbing ->
-                    val lp = collapsingToolbar.layoutParams as AppBarLayout.LayoutParams
-                    lp.scrollFlags = if (scrubbing) {
-                        AppBarLayout.LayoutParams.SCROLL_FLAG_NO_SCROLL
-                    } else {
-                        scrollFlags
-                    }
-                    collapsingToolbar.layoutParams = lp
-                }
+    private fun endChartScrubLock() {
+        if (!isScrubLockActive) return
+        isScrubLockActive = false
+        requestChartGestureOwnership(active = false)
+        setStreamListScrollEnabled(enabled = true)
+    }
+
+    private fun requestChartGestureOwnership(active: Boolean) {
+        var view: View? = findViewById(R.id.cv_demo_header)
+        while (view != null) {
+            (view.parent as? ViewGroup)?.requestDisallowInterceptTouchEvent(active)
+            view = view.parent as? View
         }
+    }
+
+    private fun setStreamListScrollEnabled(enabled: Boolean) {
+        supportFragmentManager.fragments
+            .filterIsInstance<StreamStubFragment>()
+            .forEach { fragment -> fragment.setListScrollEnabled(enabled) }
     }
 }

@@ -18,7 +18,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.rememberNestedScrollInteropConnection
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -39,6 +41,8 @@ import kotlin.math.sin
 private val ChartGreen = Color(0xFF00AB6B)
 private val ChartRed = Color(0xFFEE4A49)
 
+private const val DemoPreviousClose = 1_650_000_000.0
+
 data class DemoChartPoint(
     val index: Int,
     val price: Float,
@@ -47,7 +51,7 @@ data class DemoChartPoint(
 )
 
 fun generateDemoChartPoints(count: Int = 48): List<DemoChartPoint> {
-    val previousClose = 1_650_000_000f
+    val previousClose = DemoPreviousClose.toFloat()
     return (0 until count).map { index ->
         val price = previousClose + sin(index * 0.35f) * 45_000_000f + index * 1_200_000f
         val change = price - previousClose
@@ -66,16 +70,18 @@ fun CryptoDetailDemoHeaderContent(
     chartPoints: List<DemoChartPoint>,
     scrubbedPoint: DemoChartPoint?,
     onScrub: (DemoChartPoint) -> Unit,
+    onScrubStart: () -> Unit,
     onScrubEnd: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val displayPoint = scrubbedPoint ?: chartPoints.lastOrNull()
-    val previousClose = chartPoints.firstOrNull()?.let { it.price - it.change } ?: 0f
+    val previousClose = DemoPreviousClose
     val isPositive = (displayPoint?.change ?: 0f) >= 0f
 
     Column(
         modifier = modifier
             .fillMaxWidth()
+            .nestedScroll(rememberNestedScrollInteropConnection())
             .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
         Text(
@@ -111,42 +117,47 @@ fun CryptoDetailDemoHeaderContent(
                 .padding(start = 14.dp, end = 18.dp),
             contentAlignment = Alignment.Center,
         ) {
-            CryptoDetailDemoChart(
-            chartPoints = chartPoints,
-            previousClose = previousClose,
-            onScrub = onScrub,
+            CryptoDetailDemoLineChart(
+                chartPoints = chartPoints,
+                previousClose = previousClose,
+                onScrub = onScrub,
+                onScrubStart = onScrubStart,
                 onScrubEnd = onScrubEnd,
             )
         }
     }
 }
 
+/**
+ * Line chart settings mirror Stockbit [CryptoLineChart] in crypto-detail.
+ */
 @Composable
-private fun CryptoDetailDemoChart(
+private fun CryptoDetailDemoLineChart(
     chartPoints: List<DemoChartPoint>,
-    previousClose: Float,
+    previousClose: Double,
     onScrub: (DemoChartPoint) -> Unit,
+    onScrubStart: () -> Unit,
     onScrubEnd: () -> Unit,
 ) {
     val view = LocalView.current
     var lastScrubIndex by remember { mutableIntStateOf(-1) }
 
     val entries = remember(chartPoints) {
-        chartPoints.map { DemoChartPoint ->
-            Entry(x = DemoChartPoint.index.toFloat(), y = DemoChartPoint.price)
+        chartPoints.mapIndexedNotNull { index, point ->
+            Entry(x = index.toFloat(), y = point.price)
         }
     }
     if (entries.isEmpty()) return
 
     val lastPrice = entries.last().y
-    val lineColor = if (lastPrice >= previousClose) ChartGreen else ChartRed
+    val lineColor = if (lastPrice >= previousClose.toFloat()) ChartGreen else ChartRed
 
     val lineData = remember(entries, lineColor) {
         LineData(
             dataSets = listOf(
                 LineDataSet(
                     entries = entries,
-                    label = "BTC",
+                    label = "Price",
                     lineColor = lineColor,
                     lineWidth = 1.5.dp,
                     drawCircles = false,
@@ -163,10 +174,10 @@ private fun CryptoDetailDemoChart(
     }
 
     val limitLines = remember(previousClose) {
-        if (previousClose > 0f) {
+        if (previousClose > 0.0) {
             listOf(
                 LimitLine(
-                    value = previousClose,
+                    value = previousClose.toFloat(),
                     label = "",
                     color = Color.Gray,
                     lineWidth = 0.5.dp,
@@ -179,69 +190,67 @@ private fun CryptoDetailDemoChart(
     }
 
     val chartState = rememberLineChartState()
+
     LaunchedEffect(lineData) {
         chartState.replaceData(lineData)
     }
 
-    Box(
-        modifier = Modifier.fillMaxWidth(),
-        contentAlignment = Alignment.Center,
-    ) {
-        LineChart(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(250.dp),
-            data = lineData,
-            state = chartState,
-            xAxis = {
-                drawLabels = false
-                gridEnabled = false
-                axisLineEnabled = false
-            },
-            yAxis = {
-                position = YAxisPosition.Right
-                drawLabels = true
-                gridEnabled = false
-                axisLineEnabled = false
-                this.limitLines = limitLines
-                formatter = ::formatYAxisLabel
-            },
-            gestures = {
-                dragToScrub = true
-                longPressToDrag = true
-                tapToHighlight = false
-                scrubThreshold = 1000.dp
-            },
-            highlight = {
-                crosshairEnabled = true
-                crosshairMode = CrosshairMode.VerticalOnly
-                yAxisLabel = false
-                xAxisLabel = true
-                xAxisLabelPosition = XAxisLabelPosition.Top
-                xAxisLabelFormatter = { x ->
-                    val index = x.toInt().coerceIn(0, chartPoints.lastIndex)
-                    formatScrubPrice(chartPoints[index].price)
-                }
-                circleRadius = 3.dp
-                circleColor = lineColor
-                circleStrokeWidth = 0.dp
-            },
-            legend = { enabled = false },
-            style = { backgroundColor = Color.Transparent },
-            onValueSelected = { entry ->
-                val index = entry.x.toInt()
-                if (index != lastScrubIndex) {
-                    lastScrubIndex = index
-                    view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
-                }
-                chartPoints.getOrNull(index)?.let(onScrub)
-            },
+    LineChart(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(250.dp),
+        data = lineData,
+        state = chartState,
+        xAxis = {
+            drawLabels = false
+            gridEnabled = false
+            axisLineEnabled = false
+        },
+        yAxis = {
+            position = YAxisPosition.Right
+            drawLabels = true
+            gridEnabled = false
+            axisLineEnabled = false
+            this.limitLines = limitLines
+            formatter = ::formatYAxisLabel
+        },
+        gestures = {
+            dragToScrub = true
+            longPressToDrag = false
+            dragToPan = false
+            tapToHighlight = false
+            scrubThreshold = 1000.dp
+        },
+        highlight = {
+            crosshairEnabled = true
+            crosshairMode = CrosshairMode.VerticalOnly
+            yAxisLabel = false
+            xAxisLabel = true
+            xAxisLabelPosition = XAxisLabelPosition.Top
+            xAxisLabelFormatter = { x ->
+                val index = x.toInt().coerceIn(0, entries.lastIndex)
+                formatScrubPrice(entries[index].y)
+            }
+            circleRadius = 3.dp
+            circleColor = lineColor
+            circleStrokeWidth = 0.dp
+        },
+        legend = { enabled = false },
+        style = { backgroundColor = Color.Transparent },
+        onValueSelected = { entry ->
+            val index = entry.x.toInt()
+            if (index != lastScrubIndex) {
+                lastScrubIndex = index
+                view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+            }
+            chartPoints.getOrNull(index)?.let(onScrub)
+        },
             onNothingSelected = {
                 lastScrubIndex = -1
                 onScrubEnd()
             },
+            onScrubStarted = onScrubStart,
         )
-    }
 }
 
 private fun formatIdr(value: Float): String {
