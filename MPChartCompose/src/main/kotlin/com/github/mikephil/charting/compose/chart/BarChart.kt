@@ -102,6 +102,7 @@ fun BarChart(
         tapToHighlight = gestureConfig.tapToHighlight,
         dragToPan = gestureConfig.dragToPan,
         dragToScrub = gestureConfig.dragToScrub,
+        longPressToDrag = gestureConfig.longPressToDrag,
         flingEnabled = gestureConfig.flingDeceleration,
         scrubThreshold = gestureConfig.scrubThreshold,
         highlightState = highlightState,

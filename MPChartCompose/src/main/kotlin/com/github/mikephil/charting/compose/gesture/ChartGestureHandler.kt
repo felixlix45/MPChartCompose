@@ -12,11 +12,13 @@ import com.github.mikephil.charting.compose.highlight.Highlight
 import com.github.mikephil.charting.compose.util.Transformer
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 internal fun Modifier.chartGestureHandler(
     tapToHighlight: Boolean,
     dragToPan: Boolean,
     dragToScrub: Boolean,
+    longPressToDrag: Boolean,
     flingEnabled: Boolean,
     scrubThreshold: Dp,
     highlightState: MutableState<Highlight?>,
@@ -28,10 +30,12 @@ internal fun Modifier.chartGestureHandler(
     onValueSelected: ((Int) -> Unit)?,
     onNothingSelected: (() -> Unit)?,
 ): Modifier = this.pointerInput(
-    tapToHighlight, dragToPan, dragToScrub, flingEnabled
+    tapToHighlight, dragToPan, dragToScrub, longPressToDrag, flingEnabled
 ) {
     val flingDecelerator = FlingDecelerator()
     val scrubThresholdPx = scrubThreshold.toPx()
+    val longPressTimeoutMs = viewConfiguration.longPressTimeoutMillis
+    val touchSlopPx = viewConfiguration.touchSlop
 
     coroutineScope {
         awaitEachGesture {
@@ -54,14 +58,51 @@ internal fun Modifier.chartGestureHandler(
                 false
             }
 
-            // Handle tap
-            if (tapToHighlight && nearestIdx >= 0) {
-                val currentHighlight = highlightState.value
-                if (currentHighlight != null && currentHighlight.entryIndex == nearestIdx) {
-                    // Tapping the already-highlighted point → deselect
-                    highlightState.value = null
-                    onNothingSelected?.invoke()
-                } else {
+            // Long-press gate: when required for scrub, wait before entering scrub mode.
+            // During the wait, pointer events are NOT consumed so parent scrollable
+            // containers can intercept the gesture for scrolling.
+            if (isScrub && longPressToDrag) {
+                var fingerLifted = false
+                val wasCancelled = withTimeoutOrNull(longPressTimeoutMs) {
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        val change = event.changes.firstOrNull { it.id == down.id }
+                        if (change == null || !change.pressed) {
+                            fingerLifted = true
+                            break
+                        }
+                        if ((change.position - down.position).getDistance() > touchSlopPx) {
+                            break
+                        }
+                    }
+                }
+
+                if (wasCancelled != null) {
+                    // Long-press NOT confirmed — handle as tap if finger was lifted
+                    if (fingerLifted && tapToHighlight && nearestIdx >= 0) {
+                        val currentHighlight = highlightState.value
+                        if (currentHighlight != null && currentHighlight.entryIndex == nearestIdx) {
+                            highlightState.value = null
+                            onNothingSelected?.invoke()
+                        } else {
+                            val entryX = getEntryX(nearestIdx)
+                            val entryY = getEntryY(nearestIdx)
+                            val pixel = transformer.dataToPixel(entryX, entryY)
+                            highlightState.value = Highlight(
+                                dataSetIndex = 0,
+                                entryIndex = nearestIdx,
+                                x = entryX,
+                                y = entryY,
+                                pixelPosition = pixel,
+                            )
+                            onValueSelected?.invoke(nearestIdx)
+                        }
+                    }
+                    return@awaitEachGesture
+                }
+
+                // Long-press confirmed → set initial highlight
+                if (nearestIdx >= 0) {
                     val entryX = getEntryX(nearestIdx)
                     val entryY = getEntryY(nearestIdx)
                     val pixel = transformer.dataToPixel(entryX, entryY)
@@ -73,6 +114,28 @@ internal fun Modifier.chartGestureHandler(
                         pixelPosition = pixel,
                     )
                     onValueSelected?.invoke(nearestIdx)
+                }
+            } else {
+                // Handle tap (original behavior, no long-press gate)
+                if (tapToHighlight && nearestIdx >= 0) {
+                    val currentHighlight = highlightState.value
+                    if (currentHighlight != null && currentHighlight.entryIndex == nearestIdx) {
+                        // Tapping the already-highlighted point → deselect
+                        highlightState.value = null
+                        onNothingSelected?.invoke()
+                    } else {
+                        val entryX = getEntryX(nearestIdx)
+                        val entryY = getEntryY(nearestIdx)
+                        val pixel = transformer.dataToPixel(entryX, entryY)
+                        highlightState.value = Highlight(
+                            dataSetIndex = 0,
+                            entryIndex = nearestIdx,
+                            x = entryX,
+                            y = entryY,
+                            pixelPosition = pixel,
+                        )
+                        onValueSelected?.invoke(nearestIdx)
+                    }
                 }
             }
 
