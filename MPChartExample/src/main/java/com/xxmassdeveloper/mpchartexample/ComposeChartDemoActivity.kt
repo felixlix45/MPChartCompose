@@ -34,6 +34,7 @@ import com.github.mikephil.charting.compose.animation.ChartAnimation
 import com.github.mikephil.charting.compose.chart.BarChart
 import com.github.mikephil.charting.compose.chart.CandleChart
 import com.github.mikephil.charting.compose.chart.LineChart
+import com.github.mikephil.charting.compose.scope.MinMaxLabelScope
 import com.github.mikephil.charting.compose.data.BarData
 import com.github.mikephil.charting.compose.data.BarDataSet
 import com.github.mikephil.charting.compose.data.BarEntry
@@ -157,6 +158,13 @@ private fun ComposeChartDemoScreen() {
                 },
                 legend = { enabled = true },
                 onValueSelected = { },
+                minMaxLabel = {
+                    maxTextColor = Color(0xFF4CAF50)
+                    minTextColor = Color(0xFFFF5252)
+                    textSize = 11.sp
+                    fontWeight = FontWeight.Bold
+                    formatter = { value -> "$${String.format("%.0f", value)}" }
+                },
             )
 
             // 2. Line Chart with Glow Effect
@@ -197,6 +205,13 @@ private fun ComposeChartDemoScreen() {
                     gridColor = Color(0xFF21262D)
                 },
                 legend = { enabled = true },
+                minMaxLabel = {
+                    maxTextColor = Color(0xFF4CAF50)
+                    minTextColor = Color(0xFFFF5252)
+                    textSize = 11.sp
+                    fontWeight = FontWeight.Bold
+                    formatter = { value -> "$${String.format("%.0f", value)}" }
+                },
             )
 
             // 3. Line Chart with Fill

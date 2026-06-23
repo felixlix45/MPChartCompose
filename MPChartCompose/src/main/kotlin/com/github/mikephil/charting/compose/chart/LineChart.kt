@@ -23,11 +23,13 @@ import com.github.mikephil.charting.compose.renderer.HighlightRenderer
 import com.github.mikephil.charting.compose.renderer.LegendRenderer
 import com.github.mikephil.charting.compose.renderer.LimitLineRenderer
 import com.github.mikephil.charting.compose.renderer.LineDataRenderer
+import com.github.mikephil.charting.compose.renderer.MinMaxLabelRenderer
 import com.github.mikephil.charting.compose.scope.AnimationScope
 import com.github.mikephil.charting.compose.scope.ChartStyleScope
 import com.github.mikephil.charting.compose.scope.GestureScope
 import com.github.mikephil.charting.compose.scope.HighlightScope
 import com.github.mikephil.charting.compose.scope.LegendScope
+import com.github.mikephil.charting.compose.scope.MinMaxLabelScope
 import com.github.mikephil.charting.compose.scope.ViewportScope
 import com.github.mikephil.charting.compose.scope.XAxisScope
 import com.github.mikephil.charting.compose.scope.YAxisScope
@@ -58,6 +60,8 @@ fun LineChart(
     onNothingSelected: (() -> Unit)? = null,
     onScrubTouchDown: (() -> Unit)? = null,
     onScrubStarted: (() -> Unit)? = null,
+    /** Optional labels drawn at the highest and lowest y-values. Null means no labels. */
+    minMaxLabel: (MinMaxLabelScope.() -> Unit)? = null,
 ) {
     // Resolve configurations
     val baseStyle = LocalChartStyle.current
@@ -73,6 +77,7 @@ fun LineChart(
     val animConfig = remember { AnimationScope() }.also { animation?.invoke(it) }
     val legendConfig = remember { LegendScope() }.also { legend?.invoke(it) }
     val viewportConfig = remember { ViewportScope() }.also { viewport?.invoke(it) }
+    val minMaxLabelConfig = remember { MinMaxLabelScope() }.also { minMaxLabel?.invoke(it) }
 
     // State
     val highlightState = remember { mutableStateOf<Highlight?>(null) }
@@ -242,6 +247,25 @@ fun LineChart(
             // Layer 3: Data
             with(LineDataRenderer) {
                 drawLineData(currentData.dataSets, transformer, appearPhase, pathCaches, chartStyle.axisLineColor)
+            }
+
+            // Layer 3.5: Min/Max Labels
+            if (minMaxLabel != null) {
+                val maxEntry = allEntriesNow.maxByOrNull { it.y }
+                val minEntry = allEntriesNow.minByOrNull { it.y }
+                if (maxEntry != null && minEntry != null) {
+                    with(MinMaxLabelRenderer) {
+                        drawMinMaxLabels(
+                            maxEntry = maxEntry,
+                            minEntry = minEntry,
+                            transformer = transformer,
+                            config = minMaxLabelConfig,
+                            textMeasurer = textMeasurer,
+                            defaultColor = chartStyle.axisLabelColor,
+                            defaultTextSize = chartStyle.axisLabelSize,
+                        )
+                    }
+                }
             }
 
             // Layer 4: Highlights
