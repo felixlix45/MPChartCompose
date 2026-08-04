@@ -56,6 +56,10 @@
             android:name=".ComposeChartDemoActivity"
             android:label="Compose Charts Demo"
             android:exported="true" />
+        <activity
+            android:name=".cryptodetaildemo.CryptoDetailScrollScrubDemoActivity"
+            android:label="Crypto Detail Scroll/Scrub Demo"
+            android:exported="true" />
     </application>
 
 </manifest>

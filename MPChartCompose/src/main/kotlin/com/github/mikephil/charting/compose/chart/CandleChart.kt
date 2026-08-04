@@ -14,6 +14,7 @@ import androidx.compose.ui.unit.TextUnit
 import com.github.mikephil.charting.compose.animation.ChartAnimator
 import com.github.mikephil.charting.compose.data.CandleData
 import com.github.mikephil.charting.compose.data.CandleEntry
+import com.github.mikephil.charting.compose.data.YAxisPosition
 import com.github.mikephil.charting.compose.gesture.chartGestureHandler
 import com.github.mikephil.charting.compose.highlight.Highlight
 import com.github.mikephil.charting.compose.renderer.AxisLabelRenderer
@@ -32,8 +33,10 @@ import com.github.mikephil.charting.compose.scope.XAxisScope
 import com.github.mikephil.charting.compose.scope.YAxisScope
 import com.github.mikephil.charting.compose.state.CandleChartState
 import com.github.mikephil.charting.compose.style.LocalChartStyle
+import com.github.mikephil.charting.compose.util.AxisComputer
 import com.github.mikephil.charting.compose.util.EntryFinder
 import com.github.mikephil.charting.compose.util.Transformer
+import kotlin.math.abs
 
 @Composable
 fun CandleChart(
@@ -50,6 +53,8 @@ fun CandleChart(
     legend: (LegendScope.() -> Unit)? = null,
     viewport: (ViewportScope.() -> Unit)? = null,
     onValueSelected: ((CandleEntry) -> Unit)? = null,
+    onNothingSelected: (() -> Unit)? = null,
+    onScrubStarted: (() -> Unit)? = null,
 ) {
     // Resolve configurations
     val baseStyle = LocalChartStyle.current
@@ -98,6 +103,7 @@ fun CandleChart(
         tapToHighlight = gestureConfig.tapToHighlight,
         dragToPan = gestureConfig.dragToPan,
         dragToScrub = gestureConfig.dragToScrub,
+        longPressToDrag = gestureConfig.longPressToDrag,
         flingEnabled = gestureConfig.flingDeceleration,
         scrubThreshold = gestureConfig.scrubThreshold,
         highlightState = highlightState,
@@ -111,6 +117,8 @@ fun CandleChart(
         onValueSelected = { idx ->
             allEntries.getOrNull(idx)?.let { onValueSelected?.invoke(it) }
         },
+        onNothingSelected = onNothingSelected,
+        onScrubStarted = onScrubStarted,
     )
 
     // Marker wrapper
@@ -146,21 +154,46 @@ fun CandleChart(
             val dataYMin = allEntriesNow.minOf { it.low }
             val dataYMax = allEntriesNow.maxOf { it.high }
 
-            val yPadding = (dataYMax - dataYMin) * 0.05f
-            val contentRect = Rect(
-                left = 48f, top = if (legendConfig.enabled) 24f else 8f,
-                right = size.width - 8f, bottom = size.height - 32f
-            )
+            // Y-axis range with spaceTop/spaceBottom (matching original YAxis.calculate())
+            val yDataRange = abs(dataYMax - dataYMin)
+            val adjYMin = if (yDataRange == 0f) dataYMin - 1f else dataYMin
+            val adjYMax = if (yDataRange == 0f) dataYMax + 1f else dataYMax
+            val adjYRange = abs(adjYMax - adjYMin)
+            val yMin = yAxisConfig.axisMinimum ?: (adjYMin - (adjYRange / 100f) * yAxisConfig.spaceBottom)
+            val yMax = yAxisConfig.axisMaximum ?: (adjYMax + (adjYRange / 100f) * yAxisConfig.spaceTop)
 
-            val xRange = if (dataXMin == dataXMax) (dataXMin - 1f)..(dataXMax + 1f) else dataXMin..dataXMax
-            val yRange = if (dataYMin == dataYMax) (dataYMin - 1f)..(dataYMax + 1f) else (dataYMin - yPadding)..(dataYMax + yPadding)
+            // X-axis range with spaceMin/spaceMax and custom bounds
+            val baseXMin = xAxisConfig.axisMinimum ?: (dataXMin - xAxisConfig.spaceMin)
+            val baseXMax = xAxisConfig.axisMaximum ?: (dataXMax + xAxisConfig.spaceMax)
+            val xMin = if (baseXMin == baseXMax) baseXMin - 1f else baseXMin
+            val xMax = if (baseXMin == baseXMax) baseXMax + 1f else baseXMax
+
+            val xRange = xMin..xMax
+            val yRange = yMin..yMax
+
+            // Compute labels before contentRect so we can measure y-axis label width
+            val xLabels = AxisComputer.computeAxisValues(xRange.start, xRange.endInclusive, xAxisConfig.labelCount, xAxisConfig.granularity, xAxisConfig.forceLabels).labels
+            val yLabels = AxisComputer.computeAxisValues(yRange.start, yRange.endInclusive, yAxisConfig.labelCount, yAxisConfig.granularity, yAxisConfig.forceLabels).labels
+
+            // Measure widest y-axis label to size the content rect
+            val labelStyle = androidx.compose.ui.text.TextStyle(color = chartStyle.axisLabelColor, fontSize = chartStyle.axisLabelSize)
+            val yAxisWidth = if (yAxisConfig.drawLabels && yLabels.isNotEmpty()) {
+                yLabels.maxOf { value ->
+                    val text = yAxisConfig.formatter?.invoke(value) ?: value.toString()
+                    textMeasurer.measure(text, labelStyle).size.width
+                }.toFloat() + 8f
+            } else 8f
+
+            val yAxisOnRight = yAxisConfig.position == YAxisPosition.Right
+            val contentRect = Rect(
+                left = if (yAxisOnRight) 8f else yAxisWidth,
+                top = if (legendConfig.enabled) 24f else 8f,
+                right = if (yAxisOnRight) size.width - yAxisWidth else size.width - 8f,
+                bottom = size.height - 32f
+            )
 
             val transformer = Transformer(contentRect, xRange, yRange)
             currentTransformer = transformer
-
-            // Compute label values
-            val xLabels = computeLabels(xRange, xAxisConfig.labelCount)
-            val yLabels = computeLabels(yRange, yAxisConfig.labelCount)
 
             // Layer 2: Grid + Axes
             with(GridRenderer) {
@@ -175,6 +208,7 @@ fun CandleChart(
                     axisLineColor = chartStyle.axisLineColor,
                     drawXAxisLine = xAxisConfig.axisLineEnabled,
                     drawYAxisLine = yAxisConfig.axisLineEnabled,
+                    yAxisOnRight = yAxisOnRight,
                 )
             }
 
@@ -186,7 +220,7 @@ fun CandleChart(
             }
             if (yAxisConfig.drawLabels) {
                 with(AxisLabelRenderer) {
-                    drawYAxisLabels(transformer, yLabels, yAxisConfig.formatter, textMeasurer, chartStyle.axisLabelColor, chartStyle.axisLabelSize)
+                    drawYAxisLabels(transformer, yLabels, yAxisConfig.formatter, textMeasurer, chartStyle.axisLabelColor, chartStyle.axisLabelSize, yAxisOnRight = yAxisOnRight)
                 }
             }
 
@@ -210,6 +244,7 @@ fun CandleChart(
                         highlight = hl,
                         transformer = transformer,
                         crosshairEnabled = highlightConfig.crosshairEnabled,
+                        crosshairMode = highlightConfig.crosshairMode,
                         crosshairColor = highlightConfig.crosshairColor,
                         crosshairWidth = highlightConfig.crosshairWidth,
                         circleRadius = highlightConfig.circleRadius,

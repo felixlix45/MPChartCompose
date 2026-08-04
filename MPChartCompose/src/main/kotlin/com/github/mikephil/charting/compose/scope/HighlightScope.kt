@@ -6,12 +6,15 @@ import androidx.compose.ui.unit.dp
 
 enum class XAxisLabelPosition { Bottom, Top }
 
+enum class CrosshairMode { Both, VerticalOnly, HorizontalOnly }
+
 class HighlightScope {
     var circleRadius: Dp = 6.dp
     var circleColor: Color = Color.White
     var circleStrokeWidth: Dp = 2.dp
     var circleStrokeColor: Color = Color.Unspecified
     var crosshairEnabled: Boolean = true
+    var crosshairMode: CrosshairMode = CrosshairMode.Both
     var crosshairColor: Color = Color(0xFF888888)
     var crosshairWidth: Dp = 1.dp
     var yAxisLabel: Boolean = false

@@ -1,5 +1,6 @@
 package com.xxmassdeveloper.mpchartexample
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -23,13 +25,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.xxmassdeveloper.mpchartexample.cryptodetaildemo.CryptoDetailScrollScrubDemoActivity
 import com.github.mikephil.charting.compose.animation.ChartAnimation
 import com.github.mikephil.charting.compose.chart.BarChart
 import com.github.mikephil.charting.compose.chart.CandleChart
 import com.github.mikephil.charting.compose.chart.LineChart
+import com.github.mikephil.charting.compose.scope.MinMaxLabelScope
 import com.github.mikephil.charting.compose.data.BarData
 import com.github.mikephil.charting.compose.data.BarDataSet
 import com.github.mikephil.charting.compose.data.BarEntry
@@ -42,6 +47,7 @@ import com.github.mikephil.charting.compose.data.LineData
 import com.github.mikephil.charting.compose.data.LineDataSet
 import com.github.mikephil.charting.compose.data.LineGlow
 import com.github.mikephil.charting.compose.data.LineMode
+import com.github.mikephil.charting.compose.scope.CrosshairMode
 import com.github.mikephil.charting.compose.scope.XAxisLabelPosition
 import com.github.mikephil.charting.compose.style.ChartStyle
 import com.github.mikephil.charting.compose.style.ChartThemeProvider
@@ -61,6 +67,7 @@ class ComposeChartDemoActivity : ComponentActivity() {
 @Composable
 private fun ComposeChartDemoScreen() {
     val darkBackground = Color(0xFF121212)
+    val context = LocalContext.current
 
     ChartThemeProvider(
         style = ChartStyle(
@@ -93,6 +100,17 @@ private fun ComposeChartDemoScreen() {
                 fontSize = 14.sp,
             )
 
+            Button(
+                onClick = {
+                    context.startActivity(
+                        Intent(context, CryptoDetailScrollScrubDemoActivity::class.java),
+                    )
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Open Crypto Detail Scroll/Scrub Demo")
+            }
+
             Spacer(modifier = Modifier.height(8.dp))
 
             // 1. Simple Line Chart
@@ -117,6 +135,7 @@ private fun ComposeChartDemoScreen() {
                 },
                 highlight = {
                     crosshairEnabled = true
+                    crosshairMode = CrosshairMode.VerticalOnly
                     circleColor = Color.White
                     circleRadius = 6.dp
                     yAxisLabel = true
@@ -139,6 +158,13 @@ private fun ComposeChartDemoScreen() {
                 },
                 legend = { enabled = true },
                 onValueSelected = { },
+                minMaxLabel = {
+                    maxTextColor = Color(0xFF4CAF50)
+                    minTextColor = Color(0xFFFF5252)
+                    textSize = 11.sp
+                    fontWeight = FontWeight.Bold
+                    formatter = { value -> "$${String.format("%.0f", value)}" }
+                },
             )
 
             // 2. Line Chart with Glow Effect
@@ -179,6 +205,13 @@ private fun ComposeChartDemoScreen() {
                     gridColor = Color(0xFF21262D)
                 },
                 legend = { enabled = true },
+                minMaxLabel = {
+                    maxTextColor = Color(0xFF4CAF50)
+                    minTextColor = Color(0xFFFF5252)
+                    textSize = 11.sp
+                    fontWeight = FontWeight.Bold
+                    formatter = { value -> "$${String.format("%.0f", value)}" }
+                },
             )
 
             // 3. Line Chart with Fill

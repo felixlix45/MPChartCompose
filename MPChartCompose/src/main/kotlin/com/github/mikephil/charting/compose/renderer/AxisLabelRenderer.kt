@@ -45,7 +45,8 @@ internal object AxisLabelRenderer {
         textMeasurer: TextMeasurer,
         textColor: Color,
         textSize: TextUnit,
-        leftOffset: Float = 4f,
+        yAxisOnRight: Boolean = false,
+        labelOffset: Float = 4f,
     ) {
         val style = TextStyle(color = textColor, fontSize = textSize)
         val contentRect = transformer.contentRect
@@ -58,9 +59,14 @@ internal object AxisLabelRenderer {
                 contentRect.top,
                 contentRect.bottom - measured.size.height
             )
+            val x = if (yAxisOnRight) {
+                contentRect.right + labelOffset
+            } else {
+                contentRect.left - measured.size.width - labelOffset
+            }
             drawText(
                 textLayoutResult = measured,
-                topLeft = Offset(contentRect.left - measured.size.width - leftOffset, y),
+                topLeft = Offset(x, y),
             )
         }
     }

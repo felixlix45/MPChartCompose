@@ -14,6 +14,7 @@ import androidx.compose.ui.unit.TextUnit
 import com.github.mikephil.charting.compose.animation.ChartAnimator
 import com.github.mikephil.charting.compose.data.Entry
 import com.github.mikephil.charting.compose.data.LineData
+import com.github.mikephil.charting.compose.data.YAxisPosition
 import com.github.mikephil.charting.compose.gesture.chartGestureHandler
 import com.github.mikephil.charting.compose.highlight.Highlight
 import com.github.mikephil.charting.compose.renderer.AxisLabelRenderer
@@ -22,20 +23,24 @@ import com.github.mikephil.charting.compose.renderer.HighlightRenderer
 import com.github.mikephil.charting.compose.renderer.LegendRenderer
 import com.github.mikephil.charting.compose.renderer.LimitLineRenderer
 import com.github.mikephil.charting.compose.renderer.LineDataRenderer
+import com.github.mikephil.charting.compose.renderer.MinMaxLabelRenderer
 import com.github.mikephil.charting.compose.scope.AnimationScope
 import com.github.mikephil.charting.compose.scope.ChartStyleScope
 import com.github.mikephil.charting.compose.scope.GestureScope
 import com.github.mikephil.charting.compose.scope.HighlightScope
 import com.github.mikephil.charting.compose.scope.LegendScope
+import com.github.mikephil.charting.compose.scope.MinMaxLabelScope
 import com.github.mikephil.charting.compose.scope.ViewportScope
 import com.github.mikephil.charting.compose.scope.XAxisScope
 import com.github.mikephil.charting.compose.scope.YAxisScope
 import com.github.mikephil.charting.compose.state.LineChartState
 import com.github.mikephil.charting.compose.style.ChartStyle
 import com.github.mikephil.charting.compose.style.LocalChartStyle
+import com.github.mikephil.charting.compose.util.AxisComputer
 import com.github.mikephil.charting.compose.util.EntryFinder
 import com.github.mikephil.charting.compose.util.PathCache
 import com.github.mikephil.charting.compose.util.Transformer
+import kotlin.math.abs
 
 @Composable
 fun LineChart(
@@ -52,6 +57,11 @@ fun LineChart(
     legend: (LegendScope.() -> Unit)? = null,
     viewport: (ViewportScope.() -> Unit)? = null,
     onValueSelected: ((Entry) -> Unit)? = null,
+    onNothingSelected: (() -> Unit)? = null,
+    onScrubTouchDown: (() -> Unit)? = null,
+    onScrubStarted: (() -> Unit)? = null,
+    /** Optional labels drawn at the highest and lowest y-values. Null means no labels. */
+    minMaxLabel: (MinMaxLabelScope.() -> Unit)? = null,
 ) {
     // Resolve configurations
     val baseStyle = LocalChartStyle.current
@@ -67,6 +77,7 @@ fun LineChart(
     val animConfig = remember { AnimationScope() }.also { animation?.invoke(it) }
     val legendConfig = remember { LegendScope() }.also { legend?.invoke(it) }
     val viewportConfig = remember { ViewportScope() }.also { viewport?.invoke(it) }
+    val minMaxLabelConfig = remember { MinMaxLabelScope() }.also { minMaxLabel?.invoke(it) }
 
     // State
     val highlightState = remember { mutableStateOf<Highlight?>(null) }
@@ -104,6 +115,7 @@ fun LineChart(
         tapToHighlight = gestureConfig.tapToHighlight,
         dragToPan = gestureConfig.dragToPan,
         dragToScrub = gestureConfig.dragToScrub,
+        longPressToDrag = gestureConfig.longPressToDrag,
         flingEnabled = gestureConfig.flingDeceleration,
         scrubThreshold = gestureConfig.scrubThreshold,
         highlightState = highlightState,
@@ -117,6 +129,9 @@ fun LineChart(
         onValueSelected = { idx ->
             allEntries.getOrNull(idx)?.let { onValueSelected?.invoke(it) }
         },
+        onNothingSelected = onNothingSelected,
+        onScrubTouchDown = onScrubTouchDown,
+        onScrubStarted = onScrubStarted,
     )
 
     // Marker wrapper
@@ -152,21 +167,46 @@ fun LineChart(
             val dataYMin = allEntriesNow.minOf { it.y }
             val dataYMax = allEntriesNow.maxOf { it.y }
 
-            val yPadding = (dataYMax - dataYMin) * 0.05f
-            val contentRect = Rect(
-                left = 48f, top = if (legendConfig.enabled) 24f else 8f,
-                right = size.width - 8f, bottom = size.height - 32f
-            )
+            // Y-axis range with spaceTop/spaceBottom (matching original YAxis.calculate())
+            val yDataRange = abs(dataYMax - dataYMin)
+            val adjYMin = if (yDataRange == 0f) dataYMin - 1f else dataYMin
+            val adjYMax = if (yDataRange == 0f) dataYMax + 1f else dataYMax
+            val adjYRange = abs(adjYMax - adjYMin)
+            val yMin = yAxisConfig.axisMinimum ?: (adjYMin - (adjYRange / 100f) * yAxisConfig.spaceBottom)
+            val yMax = yAxisConfig.axisMaximum ?: (adjYMax + (adjYRange / 100f) * yAxisConfig.spaceTop)
 
-            val xRange = if (dataXMin == dataXMax) (dataXMin - 1f)..(dataXMax + 1f) else dataXMin..dataXMax
-            val yRange = if (dataYMin == dataYMax) (dataYMin - 1f)..(dataYMax + 1f) else (dataYMin - yPadding)..(dataYMax + yPadding)
+            // X-axis range with spaceMin/spaceMax and custom bounds
+            val baseXMin = xAxisConfig.axisMinimum ?: (dataXMin - xAxisConfig.spaceMin)
+            val baseXMax = xAxisConfig.axisMaximum ?: (dataXMax + xAxisConfig.spaceMax)
+            val xMin = if (baseXMin == baseXMax) baseXMin - 1f else baseXMin
+            val xMax = if (baseXMin == baseXMax) baseXMax + 1f else baseXMax
+
+            val xRange = xMin..xMax
+            val yRange = yMin..yMax
+
+            // Compute labels before contentRect so we can measure y-axis label width
+            val xLabels = AxisComputer.computeAxisValues(xRange.start, xRange.endInclusive, xAxisConfig.labelCount, xAxisConfig.granularity, xAxisConfig.forceLabels).labels
+            val yLabels = AxisComputer.computeAxisValues(yRange.start, yRange.endInclusive, yAxisConfig.labelCount, yAxisConfig.granularity, yAxisConfig.forceLabels).labels
+
+            // Measure widest y-axis label to size the content rect
+            val labelStyle = androidx.compose.ui.text.TextStyle(color = chartStyle.axisLabelColor, fontSize = chartStyle.axisLabelSize)
+            val yAxisWidth = if (yAxisConfig.drawLabels && yLabels.isNotEmpty()) {
+                yLabels.maxOf { value ->
+                    val text = yAxisConfig.formatter?.invoke(value) ?: value.toString()
+                    textMeasurer.measure(text, labelStyle).size.width
+                }.toFloat() + 8f
+            } else 8f
+
+            val yAxisOnRight = yAxisConfig.position == YAxisPosition.Right
+            val contentRect = Rect(
+                left = if (yAxisOnRight) 8f else yAxisWidth,
+                top = if (legendConfig.enabled) 24f else 8f,
+                right = if (yAxisOnRight) size.width - yAxisWidth else size.width - 8f,
+                bottom = size.height - 32f
+            )
 
             val transformer = Transformer(contentRect, xRange, yRange)
             currentTransformer = transformer
-
-            // Compute label values
-            val xLabels = computeLabels(xRange, xAxisConfig.labelCount)
-            val yLabels = computeLabels(yRange, yAxisConfig.labelCount)
 
             // Layer 2: Grid + Axes
             with(GridRenderer) {
@@ -181,6 +221,7 @@ fun LineChart(
                     axisLineColor = chartStyle.axisLineColor,
                     drawXAxisLine = xAxisConfig.axisLineEnabled,
                     drawYAxisLine = yAxisConfig.axisLineEnabled,
+                    yAxisOnRight = yAxisOnRight,
                 )
             }
 
@@ -192,7 +233,7 @@ fun LineChart(
             }
             if (yAxisConfig.drawLabels) {
                 with(AxisLabelRenderer) {
-                    drawYAxisLabels(transformer, yLabels, yAxisConfig.formatter, textMeasurer, chartStyle.axisLabelColor, chartStyle.axisLabelSize)
+                    drawYAxisLabels(transformer, yLabels, yAxisConfig.formatter, textMeasurer, chartStyle.axisLabelColor, chartStyle.axisLabelSize, yAxisOnRight = yAxisOnRight)
                 }
             }
 
@@ -208,6 +249,25 @@ fun LineChart(
                 drawLineData(currentData.dataSets, transformer, appearPhase, pathCaches, chartStyle.axisLineColor)
             }
 
+            // Layer 3.5: Min/Max Labels
+            if (minMaxLabel != null) {
+                val maxEntry = allEntriesNow.maxByOrNull { it.y }
+                val minEntry = allEntriesNow.minByOrNull { it.y }
+                if (maxEntry != null && minEntry != null) {
+                    with(MinMaxLabelRenderer) {
+                        drawMinMaxLabels(
+                            maxEntry = maxEntry,
+                            minEntry = minEntry,
+                            transformer = transformer,
+                            config = minMaxLabelConfig,
+                            textMeasurer = textMeasurer,
+                            defaultColor = chartStyle.axisLabelColor,
+                            defaultTextSize = chartStyle.axisLabelSize,
+                        )
+                    }
+                }
+            }
+
             // Layer 4: Highlights
             val hl = highlightState.value
             if (hl != null) {
@@ -216,6 +276,7 @@ fun LineChart(
                         highlight = hl,
                         transformer = transformer,
                         crosshairEnabled = highlightConfig.crosshairEnabled,
+                        crosshairMode = highlightConfig.crosshairMode,
                         crosshairColor = highlightConfig.crosshairColor,
                         crosshairWidth = highlightConfig.crosshairWidth,
                         circleRadius = highlightConfig.circleRadius,
@@ -244,10 +305,4 @@ fun LineChart(
         },
         markerContent = markerContent,
     )
-}
-
-internal fun computeLabels(range: ClosedFloatingPointRange<Float>, count: Int): List<Float> {
-    if (count <= 0) return emptyList()
-    val step = (range.endInclusive - range.start) / (count - 1).coerceAtLeast(1)
-    return (0 until count).map { range.start + it * step }
 }

@@ -46,6 +46,7 @@ import com.xxmassdeveloper.mpchartexample.ScrollViewActivity;
 import com.xxmassdeveloper.mpchartexample.StackedBarActivity;
 import com.xxmassdeveloper.mpchartexample.StackedBarActivityNegative;
 import com.xxmassdeveloper.mpchartexample.ComposeChartDemoActivity;
+import com.xxmassdeveloper.mpchartexample.cryptodetaildemo.CryptoDetailScrollScrubDemoActivity;
 import com.xxmassdeveloper.mpchartexample.fragments.SimpleChartDemo;
 
 import java.util.ArrayList;
@@ -129,6 +130,7 @@ public class MainActivity extends AppCompatActivity implements OnItemClickListen
         objects.add(38, new ContentItem("Jetpack Compose Charts"));
 
         objects.add(39, new ContentItem("Compose Demo", "All Compose chart types: Line, Bar, Candle with glow, fill, markers."));
+        objects.add(40, new ContentItem("Crypto Detail Scroll/Scrub", "Collapsing header, chart scrub lock, ViewPager stream list."));
 
         MyAdapter adapter = new MyAdapter(this, objects);
 
@@ -245,6 +247,9 @@ public class MainActivity extends AppCompatActivity implements OnItemClickListen
                 break;*/
             case 39:
                 i = new Intent(this, ComposeChartDemoActivity.class);
+                break;
+            case 40:
+                i = new Intent(this, CryptoDetailScrollScrubDemoActivity.class);
                 break;
         }
 

@@ -14,6 +14,8 @@ enum class LineMode {
 
 enum class AxisPosition { Top, Bottom }
 
+enum class YAxisPosition { Left, Right }
+
 enum class LegendPosition { Top, Bottom, Left, Right }
 
 enum class LegendOrientation { Horizontal, Vertical }
